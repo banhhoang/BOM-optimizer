@@ -103,7 +103,7 @@ if master_file and bom_file:
             if not selected_item.empty:
                 results.append({
                     "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": selected_item.iloc[0][m_price], "Lý do": "Đã duyệt 'Chọn'"
+                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá 1000pcs Đề Xuất": selected_item.iloc[0][m_price], "Lý do": "Đã duyệt 'Chọn'"
                 })
             else:
                 # --- LOGIC 2: TÌM MÃ THAY THẾ RẺ NHẤT ---
@@ -128,12 +128,12 @@ if master_file and bom_file:
                     best = pd.DataFrame(valid_list).sort_values('p_num').iloc[0]
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất& đạt yêu cầu kỹ thuật"
+                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá 1000pcs Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất& đạt yêu cầu kỹ thuật"
                     })
                 else:
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá Đề Xuất": "---", "Lý do": "Chưa có trong Master"
+                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá 1000pcs Đề Xuất": "---", "Lý do": "Chưa có trong Master"
                     })
 
         if results:
