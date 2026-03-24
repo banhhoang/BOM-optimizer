@@ -133,7 +133,7 @@ if master_file and bom_file:
                 else:
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá Đề Xuất": "---", "Lý do": "Chưa có trong Master"
+                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá 1000pcs Đề Xuất": "---", "Lý do": "Chưa có trong Master"
                     })
 
         if results:
