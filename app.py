@@ -41,17 +41,17 @@ master_file = st.sidebar.file_uploader("1. Nạp Master Data", type=['xlsx', 'xl
 bom_file = st.sidebar.file_uploader("2. Nạp BOM List", type=['xlsx', 'xls'])
 
 if master_file and bom_file:
-        dict_master = pd.read_excel(master_file, sheet_name=None)
-        for s_name in dict_master:
-            # Vừa In Hoa, Vừa xóa khoảng trắng 2 đầu, Vừa thay dấu xuống dòng thành dấu cách
-            dict_master[s_name].columns = [str(c).replace('\n', ' ').strip().upper() for c in dict_master[s_name].columns]
+    dict_master = pd.read_excel(master_file, sheet_name=None)
+    for s_name in dict_master:
+        # Vừa In Hoa, Vừa xóa khoảng trắng 2 đầu, Vừa thay dấu xuống dòng thành dấu cách
+        dict_master[s_name].columns = [str(c).replace('\n', ' ').strip().upper() for c in dict_master[s_name].columns]
 
-        df_bom = pd.read_excel(bom_file)
-        # Tương tự cho file BOM
-        df_bom.columns = [str(c).replace('\n', ' ').strip().upper() for c in df_bom.columns]
+    df_bom = pd.read_excel(bom_file)
+    # Tương tự cho file BOM
+    df_bom.columns = [str(c).replace('\n', ' ').strip().upper() for c in df_bom.columns]
 
-        st.subheader("⚙️ Cấu hình cột")
-        sample_cols = list(dict_master.values())[0].columns.tolist()
+    st.subheader("⚙️ Cấu hình cột")
+    sample_cols = list(dict_master.values())[0].columns.tolist()
     
     col1, col2 = st.columns(2)
     with col1:
