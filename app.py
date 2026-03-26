@@ -4,10 +4,9 @@ import re
 import io
 
 st.set_page_config(page_title="BOM Checker Pro", layout="wide")
-st.title("🚀 Đối chiếu BOM: Tối ưu Sai số, Công suất & Giá")
+st.title("🚀 Đối chiếu BOM: Nhập giá trực tiếp & Tối ưu kỹ thuật")
 
-# --- 1. CÁC HÀM XỬ LÝ DỮ LIỆU NÂNG CAO ---
-
+# --- 1. CÁC HÀM XỬ LÝ (GIỮ NGUYÊN & NÂNG CẤP) ---
 def is_valid_tech_type(type_val):
     t = str(type_val).upper()
     return "CAP" in t or "RES" in t
@@ -15,183 +14,165 @@ def is_valid_tech_type(type_val):
 def clean_sync_value(val):
     if pd.isna(val): return None
     s = str(val).strip().upper()
-    invalid_marks = ["#VALUE!", "#N/A", "NAN", "---", "", "NONE", "0", "#REF!"]
-    if s in invalid_marks: return None
-    return s
-
-def clean_price(value):
-    if pd.isna(value) or str(value).strip() in ["---", "", "NAN", "N/A"]: 
-        return float('inf')
-    text = str(value).replace('$', '').replace(',', '').strip()
-    try: return float(text)
-    except: return float('inf')
+    return s if s not in ["#VALUE!", "#N/A", "NAN", "---", "", "0"] else None
 
 def parse_watt(watt_str):
-    """Chuyển đổi 1/10W, 1/16W thành số thực 0.1, 0.0625"""
     if not watt_str: return 0.0
     try:
-        if '/' in watt_str:
-            num, den = watt_str.split('/')
-            return float(num) / float(den)
+        if '/' in str(watt_str):
+            n, d = str(watt_str).split('/')
+            return float(n) / float(d)
         return float(watt_str)
     except: return 0.0
 
 def extract_specs(desc):
     desc = str(desc).upper()
     specs = {'volt': 0.0, 'size': '', 'tol': 100.0, 'watt': 0.0}
-    
-    # 1. Bóc Size
-    size_match = re.search(r'(0201|0402|0603|0805|1206|1210|2010|2512)', desc)
-    if size_match: specs['size'] = size_match.group(1)
-    
-    # 2. Bóc Volt (Tụ)
-    v_match = re.search(r'(\d+\.?\d*)\s*V', desc)
-    if v_match: specs['volt'] = float(v_match.group(1))
-    
-    # 3. Bóc Sai số (%) - Lấy số trước dấu %
-    tol_match = re.search(r'(\d+\.?\d*)\s*%', desc)
-    if tol_match: specs['tol'] = float(tol_match.group(1))
-    
-    # 4. Bóc Công suất (W) - Lấy cụm trước W (xử lý cả phân số)
-    w_match = re.search(r'(\d+/\d+|\d+\.?\d*)\s*W', desc)
-    if w_match: specs['watt'] = parse_watt(w_match.group(1))
-    
+    sz = re.search(r'(0201|0402|0603|0805|1206|1210|2010|2512)', desc)
+    if sz: specs['size'] = sz.group(1)
+    v = re.search(r'(\d+\.?\d*)\s*V', desc)
+    if v: specs['volt'] = float(v.group(1))
+    t = re.search(r'(\d+\.?\d*)\s*%', desc)
+    if t: specs['tol'] = float(t.group(1))
+    w = re.search(r'(\d+/\d+|\d+\.?\d*)\s*W', desc)
+    if w: specs['watt'] = parse_watt(w.group(1))
     return specs
 
-# --- 2. GIAO DIỆN ---
-
-master_file = st.sidebar.file_uploader("1. Nạp Master Data", type=['xlsx', 'xlsm'])
-bom_file = st.sidebar.file_uploader("2. Nạp BOM List", type=['xlsx', 'xls'])
+# --- 2. GIAO DIỆN NẠP FILE ---
+with st.sidebar:
+    master_file = st.file_uploader("1. Master Data", type=['xlsx', 'xlsm'])
+    bom_file = st.file_uploader("2. BOM List", type=['xlsx', 'xls'])
 
 if master_file and bom_file:
-    # Load Master Data
     dict_master = pd.read_excel(master_file, sheet_name=None)
-    for s_name in dict_master:
-        dict_master[s_name].columns = [str(c).strip() for c in dict_master[s_name].columns]
-
-    # Load BOM
     df_bom = pd.read_excel(bom_file)
+    
+    # Chuẩn hóa tên cột
+    for s in dict_master: dict_master[s].columns = [str(c).strip() for c in dict_master[s].columns]
     df_bom.columns = [str(c).strip() for c in df_bom.columns]
 
-    st.subheader("⚙️ Cấu hình cột")
+    st.subheader("⚙️ Bước 1: Cấu hình cột")
     sample_cols = list(dict_master.values())[0].columns.tolist()
+    b_cols = df_bom.columns.tolist()
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info("Cấu hình Master")
-        m_pn = st.selectbox("Cột P/N (Master):", sample_cols)
-        m_val = st.selectbox("Cột Giá trị đồng bộ (Master):", sample_cols)
-        m_desc = st.selectbox("Cột Mô tả (Master):", sample_cols)
-        m_price = st.selectbox("Cột Giá 1000pcs (Master):", sample_cols)
-        m_type = st.selectbox("Cột Loại hàng hóa (Master):", sample_cols)
-        m_note = st.selectbox("Cột Ghi chú (Master):", sample_cols)
-    with col2:
-        st.info("Cấu hình BOM")
-        b_cols = df_bom.columns.tolist()
-        b_pn = st.selectbox("Cột P/N (BOM):", b_cols)
-        b_qty = st.selectbox("Cột SL cần mua (BOM):", b_cols)
-        b_val = st.selectbox("Cột Giá trị đồng bộ (BOM):", b_cols)
-        b_desc = st.selectbox("Cột Mô tả (BOM):", b_cols)
-        b_type = st.selectbox("Cột Loại hàng hóa (BOM):", b_cols)
+    c1, c2 = st.columns(2)
+    with c1:
+        m_pn = st.selectbox("P/N (Master)", sample_cols, index=0)
+        m_val = st.selectbox("Giá trị đồng bộ (Master)", sample_cols, index=1)
+        m_price = st.selectbox("Giá 1000pcs (Master)", sample_cols, index=2)
+        m_desc = st.selectbox("Mô tả (Master)", sample_cols, index=3)
+        m_type = st.selectbox("Loại hàng (Master)", sample_cols, index=4)
+        m_note = st.selectbox("Ghi chú (Master)", sample_cols, index=5)
+    with c2:
+        b_pn = st.selectbox("P/N (BOM)", b_cols)
+        b_val = st.selectbox("Giá trị đồng bộ (BOM)", b_cols)
+        b_desc = st.selectbox("Mô tả (BOM)", b_cols)
+        b_type = st.selectbox("Loại hàng (BOM)", b_cols)
+        b_qty = st.selectbox("SL cần", b_cols)
 
-    # Khởi tạo session state để lưu kết quả tạm
-    if 'final_results' not in st.session_state:
-        st.session_state.final_results = None
+    st.divider()
 
-    if st.button("🚀 PHÂN TÍCH VÀ TÌM KIẾM", type="primary"):
-        results = []
+    # --- BƯỚC 2: TÌM MÃ MỚI CẦN NHẬP GIÁ ---
+    if st.button("🔍 KIỂM TRA MÃ MỚI (TRƯỜNG HỢP 3)"):
+        new_items = []
         for _, row in df_bom.iterrows():
-            raw_type_bom = row.get(b_type, "")
-            raw_val_bom = row.get(b_val, "")
-            qty_bom = row.get(b_qty, 0)
-            clean_v_bom = clean_sync_value(raw_val_bom)
+            specs = extract_specs(row[b_desc])
+            clean_v = clean_sync_value(row[b_val])
+            if specs['size'] in ["0402", "0603"] and is_valid_tech_type(row[b_type]) and clean_v:
+                target_df = dict_master.get(specs['size'], pd.DataFrame())
+                # Kiểm tra xem mã này đã có giá trong Master chưa
+                exists = target_df[target_df[m_pn].astype(str).str.upper() == str(row[b_pn]).upper()]
+                if exists.empty or pd.isna(exists.iloc[0][m_price]):
+                    new_items.append({
+                        "P/N BOM": row[b_pn],
+                        "Giá trị": clean_v,
+                        "Size": specs['size'],
+                        "Loại": row[b_type],
+                        "Giá 1000pcs": 0.0,
+                        "Sai số (%)": specs['tol'],
+                        "Công suất/Áp": specs['watt'] if "RES" in str(row[b_type]).upper() else specs['volt']
+                    })
+        
+        if new_items:
+            st.session_state.new_codes_df = pd.DataFrame(new_items).drop_duplicates(subset=['P/N BOM'])
+        else:
+            st.info("Không có mã mới nào cần nhập giá. Bạn có thể tiến hành đối chiếu ngay.")
+            st.session_state.new_codes_df = pd.DataFrame()
+
+    # --- BƯỚC 3: BẢNG NHẬP GIÁ TRỰC TIẾP ---
+    if 'new_codes_df' in st.session_state and not st.session_state.new_codes_df.empty:
+        st.warning("📋 Danh sách mã mới (Trường hợp 3). Vui lòng điền giá và thông số chuẩn để so sánh:")
+        edited_new_codes = st.data_editor(
+            st.session_state.new_codes_df,
+            key="editor_new_codes",
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        if st.button("🚀 GHI NHẬN & BẮT ĐẦU SO SÁNH TẤT CẢ", type="primary"):
+            # Chuyển đổi bảng đã sửa thành từ điển để tra cứu nhanh
+            price_map = edited_new_codes.set_index("P/N BOM").to_dict('index')
             
-            if not is_valid_tech_type(raw_type_bom) or clean_v_bom is None:
-                continue
-            
-            pn_bom = str(row[b_pn]).strip().upper() if not pd.isna(row[b_pn]) else "N/A"
-            specs_bom = extract_specs(row[b_desc])
-            bom_size = specs_bom['size']
+            results = []
+            for _, row in df_bom.iterrows():
+                p_bom = str(row[b_pn]).upper()
+                specs_bom = extract_specs(row[b_desc])
+                clean_v_bom = clean_sync_value(row[b_val])
+                
+                # Cập nhật thông số từ bảng editor nếu có
+                if p_bom in price_map:
+                    price_bom = price_map[p_bom]['Giá 1000pcs']
+                    specs_bom['tol'] = price_map[p_bom]['Sai số (%)']
+                    if "RES" in str(row[b_type]).upper(): specs_bom['watt'] = price_map[p_bom]['Công suất/Áp']
+                    else: specs_bom['volt'] = price_map[p_bom]['Công suất/Áp']
+                else:
+                    price_bom = float('inf') # Sẽ được xử lý ở logic Master bên dưới
 
-            # 1. Chỉ check 0402 và 0603
-            if bom_size not in ["0402", "0603"]:
-                results.append({"P/N BOM": pn_bom, "SL": qty_bom, "Size": bom_size, "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": 0.0, "Lý do": "Size khác"})
-                continue
+                # LOGIC SO SÁNH CHÍNH
+                if specs_bom['size'] not in ["0402", "0603"] or not is_valid_tech_type(row[b_type]):
+                    results.append({"P/N BOM": p_bom, "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": p_bom, "Giá Đề Xuất": "---", "Lý do": "Size khác"})
+                    continue
 
-            target_df = dict_master.get(bom_size, pd.DataFrame())
-            if target_df.empty:
-                results.append({"P/N BOM": pn_bom, "SL": qty_bom, "Size": bom_size, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": pn_bom, "Giá Đề Xuất": 0.0, "Lý do": f"Không có sheet {bom_size}"})
-                continue
-
-            # --- TÌM GIÁ GỐC ---
-            original_item = target_df[target_df[m_pn].astype(str).str.upper().str.strip() == pn_bom]
-            original_price = clean_price(original_item.iloc[0][m_price]) if not original_item.empty else float('inf')
-
-            # --- LOGIC 1: ƯU TIÊN CHỮ "CHỌN" ---
-            mask_select = (target_df[m_pn].astype(str).str.upper().str.strip() == pn_bom) & \
-                          (target_df[m_note].astype(str).str.lower().str.contains("chọn", na=False))
-            selected_item = target_df[mask_select]
-
-            if not selected_item.empty:
-                results.append({"P/N BOM": pn_bom, "SL": qty_bom, "Size": bom_size, "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price, "Lý do": "Đã duyệt 'Chọn'"})
-            else:
-                # --- LOGIC 2 & 3: TÌM ỨNG VIÊN THAY THẾ ---
+                target_df = dict_master.get(specs_bom['size'], pd.DataFrame())
+                
+                # Tìm ứng viên trong Master
                 potential = target_df[
                     (target_df[m_type].apply(is_valid_tech_type)) & 
                     (target_df[m_val].apply(clean_sync_value) == clean_v_bom)
                 ]
                 
-                valid_list = []
+                valid_candidates = []
                 for _, m_row in potential.iterrows():
                     m_specs = extract_specs(m_row[m_desc])
-                    match = False
-                    if "CAP" in str(raw_type_bom).upper():
-                        # Tụ: Áp >= BOM
-                        match = (m_specs['volt'] >= specs_bom['volt'])
-                    else:
-                        # Trở: Sai số <= BOM và Công suất >= BOM
-                        match = (m_specs['tol'] <= specs_bom['tol']) and (m_specs['watt'] >= specs_bom['watt'])
+                    m_price_val = float(str(m_row[m_price]).replace('$','').replace(',','')) if pd.notna(m_row[m_price]) else float('inf')
                     
-                    if match:
-                        valid_list.append({
-                            'pn': m_row[m_pn],
-                            'price': clean_price(m_row[m_price]),
-                            'is_bom_pn': (str(m_row[m_pn]).strip().upper() == pn_bom)
-                        })
-                
-                if valid_list:
-                    # Sắp xếp tìm thằng rẻ nhất
-                    best = sorted(valid_list, key=lambda x: x['price'])[0]
-                    res_status = "⚠️ CÓ MÃ THAY THẾ" if not best['is_bom_pn'] else "✅ GIỮ NGUYÊN (Rẻ nhất)"
-                    results.append({"P/N BOM": pn_bom, "SL": qty_bom, "Size": bom_size, "Trạng thái": res_status, "Đề xuất": best['pn'], "Giá Đề Xuất": best['price'], "Lý do": "Tối ưu kỹ thuật & Giá"})
+                    # Điều kiện kỹ thuật
+                    if "CAP" in str(row[b_type]).upper():
+                        is_ok = (m_specs['volt'] >= specs_bom['volt'])
+                    else:
+                        is_ok = (m_specs['tol'] <= specs_bom['tol']) and (m_specs['watt'] >= specs_bom['watt'])
+                    
+                    if is_ok:
+                        valid_candidates.append({'pn': m_row[m_pn], 'price': m_price_val})
+
+                # So sánh giá giữa BOM và Master
+                if valid_candidates:
+                    best_m = sorted(valid_candidates, key=lambda x: x['price'])[0]
+                    if best_m['price'] < price_bom:
+                        results.append({"P/N BOM": p_bom, "Trạng thái": "⚠️ THAY THẾ RẺ HƠN", "Đề xuất": best_m['pn'], "Giá Đề Xuất": best_m['price'], "Lý do": f"Master rẻ hơn giá bạn nhập ({best_m['price']} < {price_bom})"})
+                    else:
+                        results.append({"P/N BOM": p_bom, "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": p_bom, "Giá Đề Xuất": price_bom, "Lý do": "Giá bạn nhập là tốt nhất"})
                 else:
-                    # TRƯỜNG HỢP 3: MÃ MỚI HOÀN TOÀN
-                    results.append({"P/N BOM": pn_bom, "SL": qty_bom, "Size": bom_size, "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": 0.0, "Lý do": "Chưa có mã đạt chuẩn trong Master"})
+                    results.append({"P/N BOM": p_bom, "Trạng thái": "✨ MÃ MỚI", "Đề xuất": p_bom, "Giá Đề Xuất": price_bom, "Lý do": "Không có mã Master nào đạt kỹ thuật"})
 
-        st.session_state.final_results = pd.DataFrame(results)
+            st.session_state.final_df = pd.DataFrame(results)
 
-    # --- 3. KHU VỰC NHẬP GIÁ VÀ XUẤT FILE ---
-    if st.session_state.final_results is not None:
-        st.divider()
-        st.subheader("📝 Bước 2: Cập nhật giá cho Mã mới / Kiểm tra lại")
-        st.write("Bạn có thể điền giá vào cột **Giá Đề Xuất** cho các dòng 'Mã MỚI' (Giá = 0) trước khi tải về.")
+    # --- BƯỚC 4: XUẤT KẾT QUẢ ---
+    if 'final_df' in st.session_state:
+        st.success("✅ Đã đối chiếu xong dựa trên giá bạn cung cấp!")
+        st.dataframe(st.session_state.final_df, use_container_width=True)
         
-        # Cho phép sửa trực tiếp trên bảng
-        edited_df = st.data_editor(
-            st.session_state.final_results,
-            column_config={
-                "Giá Đề Xuất": st.column_config.NumberColumn("Giá 1000pcs", format="%.2f $"),
-                "Trạng thái": st.column_config.TextColumn(disabled=True),
-                "Size": st.column_config.TextColumn(disabled=True),
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-
-        # Xuất file
-        col_dl1, col_dl2 = st.columns([1, 5])
-        with col_dl1:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                edited_df.to_excel(writer, index=False)
-            st.download_button("📥 TẢI FILE KẾT QUẢ", output.getvalue(), "BOM_Comparison_Final.xlsx", type="primary")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            st.session_state.final_df.to_excel(writer, index=False)
+        st.download_button("📥 TẢI KẾT QUẢ CUỐI CÙNG", output.getvalue(), "Ket_qua_BOM_Toi_Uu.xlsx")
