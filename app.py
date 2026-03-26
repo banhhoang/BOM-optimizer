@@ -81,7 +81,7 @@ if master_file and bom_file:
         m_val = st.selectbox("Cột Giá trị đồng bộ (Master):", sample_cols)
         m_desc = st.selectbox("Cột Mô tả (Master):", sample_cols)
         m_price = st.selectbox("Cột Giá 1000pcs (Master):", sample_cols)
-        m_price_1 = st.selectbox("Cột Giá 1pcs (Master):", sample_cols) # <-- CẬP NHẬT: Thêm cột Giá 1pcs
+        m_price_1 = st.selectbox("Cột Giá 1pcs (Master):", sample_cols)
         m_type = st.selectbox("Cột Loại hàng hóa (Master):", sample_cols)
         m_note = st.selectbox("Cột Ghi chú (Master):", sample_cols)
     with col2:
@@ -106,8 +106,8 @@ if master_file and bom_file:
                     new_codes.append({
                         "P/N BOM": row[b_pn],
                         "Size": specs['size'],
-                        "Giá 1pcs": 0.0,       # <-- CẬP NHẬT: Cho phép nhập giá 1pcs
-                        "Giá 1000pcs": 0.0,    # <-- CẬP NHẬT: Cho phép nhập giá 1000pcs
+                        "Giá 1pcs": 0.0,
+                        "Giá 1000pcs": 0.0,
                         "Sai số (%)": specs['tol'],
                         "Watt/Volt": specs['watt'] if "RES" in str(row[b_type]).upper() else specs['volt']
                     })
@@ -144,7 +144,7 @@ if master_file and bom_file:
             # Giữ nguyên logic khác size 0402, 0603
             if bom_size not in ["0402", "0603"]:
                 results.append({
-                    "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, 
+                    "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, 
                     "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": "---", "Lý do": "Chỉ ưu tiên check size 0402 & 0603"
                 })
@@ -152,7 +152,7 @@ if master_file and bom_file:
 
             target_df = dict_master.get(bom_size, pd.DataFrame())
             if target_df.empty:
-                results.append({"P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Lý do": f"Không có sheet {bom_size}"})
+                results.append({"P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Lý do": f"Không có sheet {bom_size}"})
                 continue
 
             # --- LẤY GIÁ TRỊ GỐC & CẬP NHẬT TỪ BẢNG NHẬP (NẾU LÀ MÃ MỚI) ---
@@ -192,7 +192,7 @@ if master_file and bom_file:
 
             if not selected_item.empty:
                 results.append({
-                    "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, 
+                    "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": original_price_1000, 
                     "Tổng tiền (Gốc)": round(tong_tien, 4),
                     "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Đã duyệt 'Chọn'"
@@ -223,21 +223,21 @@ if master_file and bom_file:
                     # So sánh giá để đề xuất
                     if best['p_num'] < price_to_compare:
                         results.append({
-                            "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, 
+                            "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
                             "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã Master rẻ hơn & đạt kỹ thuật"
                         })
                     else:
                         results.append({
-                            "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, 
+                            "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
                             "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Giá hiện tại là rẻ nhất"
                         })
                 else:
                     results.append({
-                        "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, 
+                        "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                         "Giá 1000pcs (Gốc)": original_price_1000, 
                         "Tổng tiền (Gốc)": round(tong_tien, 4),
                         "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Không có mã thay thế đạt kỹ thuật trong Master"
