@@ -85,6 +85,23 @@ if master_file and bom_file:
             specs_bom = extract_specs(row[b_desc])
             bom_size = specs_bom['size']
 
+            # =====================================================================
+            # 🚧 LOGIC MỚI: CHỈ CHECK 0402 VÀ 0603. CÒN LẠI BỎ QUA, GIỮ NGUYÊN MÃ
+            # =====================================================================
+            if bom_size not in ["0402", "0603"]:
+                results.append({
+                    "P/N BOM": pn_bom, 
+                    "SL cần": qty_bom, 
+                    "Size": bom_size, 
+                    "Giá 1000pcs (Gốc)": "---",
+                    "Trạng thái": "⏩ GIỮ NGUYÊN", 
+                    "Đề xuất": pn_bom, 
+                    "Giá Đề Xuất": "---", 
+                    "Lý do": "Chỉ ưu tiên check size 0402 & 0603"
+                })
+                continue
+            # =====================================================================
+
             target_df = dict_master.get(bom_size, pd.DataFrame())
             
             if target_df.empty:
@@ -128,7 +145,7 @@ if master_file and bom_file:
                     best = pd.DataFrame(valid_list).sort_values('p_num').iloc[0]
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất& đạt yêu cầu kỹ thuật"
+                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất & đạt yêu cầu kỹ thuật"
                     })
                 else:
                     results.append({
