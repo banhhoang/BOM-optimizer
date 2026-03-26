@@ -50,8 +50,8 @@ if master_file and bom_file:
         # Tương tự cho file BOM
         df_bom.columns = [str(c).replace('\n', ' ').strip().upper() for c in df_bom.columns]
 
-    st.subheader("⚙️ Cấu hình cột")
-    sample_cols = list(dict_master.values())[0].columns.tolist()
+        st.subheader("⚙️ Cấu hình cột")
+        sample_cols = list(dict_master.values())[0].columns.tolist()
     
     col1, col2 = st.columns(2)
     with col1:
