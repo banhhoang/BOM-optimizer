@@ -43,12 +43,10 @@ bom_file = st.sidebar.file_uploader("2. Nạp BOM List", type=['xlsx', 'xls'])
 if master_file and bom_file:
     dict_master = pd.read_excel(master_file, sheet_name=None)
     for s_name in dict_master:
-        # Vừa In Hoa, Vừa xóa khoảng trắng 2 đầu, Vừa thay dấu xuống dòng thành dấu cách
-        dict_master[s_name].columns = [str(c).replace('\n', ' ').strip().upper() for c in dict_master[s_name].columns]
+        dict_master[s_name].columns = [str(c).strip() for c in dict_master[s_name].columns]
 
     df_bom = pd.read_excel(bom_file)
-    # Tương tự cho file BOM
-    df_bom.columns = [str(c).replace('\n', ' ').strip().upper() for c in df_bom.columns]
+    df_bom.columns = [str(c).strip() for c in df_bom.columns]
 
     st.subheader("⚙️ Cấu hình cột")
     sample_cols = list(dict_master.values())[0].columns.tolist()
@@ -105,7 +103,7 @@ if master_file and bom_file:
             if not selected_item.empty:
                 results.append({
                     "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá 1000pcs Đề Xuất": selected_item.iloc[0][m_price], "Lý do": "Đã duyệt 'Chọn'"
+                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": selected_item.iloc[0][m_price], "Lý do": "Đã duyệt 'Chọn'"
                 })
             else:
                 # --- LOGIC 2: TÌM MÃ THAY THẾ RẺ NHẤT ---
@@ -130,12 +128,12 @@ if master_file and bom_file:
                     best = pd.DataFrame(valid_list).sort_values('p_num').iloc[0]
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá 1000pcs Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất& đạt yêu cầu kỹ thuật"
+                        "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã thay thế rẻ nhất& đạt yêu cầu kỹ thuật"
                     })
                 else:
                     results.append({
                         "P/N BOM": pn_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": original_price,
-                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá 1000pcs Đề Xuất": "---", "Lý do": "Chưa có trong Master"
+                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": "Mã mới tinh", "Giá Đề Xuất": "---", "Lý do": "Chưa có trong Master"
                     })
 
         if results:
