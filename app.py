@@ -80,6 +80,7 @@ if master_file and bom_file:
         m_pn = st.selectbox("Cột P/N (Master):", sample_cols)
         m_val = st.selectbox("Cột Giá trị đồng bộ (Master):", sample_cols)
         m_desc = st.selectbox("Cột Mô tả (Master):", sample_cols)
+        m_mfg = st.selectbox("Cột Hãng sản xuất (Master):", sample_cols) # <-- THÊM CỘT HÃNG MASTER
         m_price = st.selectbox("Cột Giá 1000pcs (Master):", sample_cols)
         m_price_1 = st.selectbox("Cột Giá 1pcs (Master):", sample_cols)
         m_stock = st.selectbox("Cột Trong kho (Master):", sample_cols) # <-- THÊM CỘT TRONG KHO
@@ -92,6 +93,7 @@ if master_file and bom_file:
         b_qty = st.selectbox("Cột SL cần mua (BOM):", b_cols)
         b_val = st.selectbox("Cột Giá trị đồng bộ (BOM):", b_cols)
         b_desc = st.selectbox("Cột Mô tả (BOM):", b_cols)
+        b_mfg = st.selectbox("Cột Hãng sản xuất (BOM):", b_cols) # <-- THÊM CỘT HÃNG BOM
         b_type = st.selectbox("Cột Loại hàng hóa (BOM):", b_cols)
 
     # Nút kiểm tra mã mới (Trường hợp 3)
@@ -137,6 +139,8 @@ if master_file and bom_file:
             qty_bom = pd.to_numeric(row.get(b_qty, 0), errors='coerce') or 0 
             clean_v_bom = clean_sync_value(raw_val_bom)
             
+            bom_mfg_val = str(row.get(b_mfg, "")) if pd.notna(row.get(b_mfg)) else "" # Lấy hãng từ BOM
+            
             if not is_valid_tech_type(raw_type_bom) or clean_v_bom is None:
                 continue
             
@@ -149,7 +153,7 @@ if master_file and bom_file:
                 results.append({
                     "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, 
-                    "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": "---", "Lý do": "Chỉ ưu tiên check size 0402 & 0603",
+                    "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": "---", "Hãng sản xuất": bom_mfg_val, "Lý do": "Chỉ ưu tiên check size 0402 & 0603",
                     "Trong kho": "---", "Hành động": "---", "SL còn lại": "---" # <-- THÊM 3 CỘT MỚI VÀO ĐÂY
                 })
                 continue
@@ -157,7 +161,7 @@ if master_file and bom_file:
             target_df = dict_master.get(bom_size, pd.DataFrame())
             if target_df.empty:
                 results.append({
-                    "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Lý do": f"Không có sheet {bom_size}",
+                    "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Hãng sản xuất": bom_mfg_val, "Lý do": f"Không có sheet {bom_size}",
                     "Trong kho": "---", "Hành động": "---", "SL còn lại": "---" # <-- THÊM 3 CỘT MỚI VÀO ĐÂY
                 })
                 continue
@@ -170,11 +174,13 @@ if master_file and bom_file:
                 original_price_1000 = original_item.iloc[0][m_price]
                 original_price_1 = clean_price(original_item.iloc[0][m_price_1])
                 price_to_compare = clean_price(original_price_1000)
+                master_mfg_val_original = str(original_item.iloc[0][m_mfg]) if pd.notna(original_item.iloc[0][m_mfg]) else bom_mfg_val
             elif pn_bom in price_map:
                 # Mã mới, lấy từ bảng user nhập
                 original_price_1000 = price_map[pn_bom]['Giá 1000pcs']
                 original_price_1 = float(price_map[pn_bom]['Giá 1pcs'])
                 price_to_compare = float(original_price_1000)
+                master_mfg_val_original = bom_mfg_val
                 
                 # Cập nhật thông số kỹ thuật (Volt/Watt, Tol) từ bảng nhập
                 specs_bom['tol'] = price_map[pn_bom]['Sai số (%)']
@@ -185,6 +191,7 @@ if master_file and bom_file:
                 original_price_1000 = "N/A"
                 original_price_1 = float('inf')
                 price_to_compare = float('inf')
+                master_mfg_val_original = bom_mfg_val
 
             # --- CẬP NHẬT: TÍNH TỔNG TIỀN MÃ GỐC: SL * Giá 1pcs ---
             if original_price_1 != float('inf'):
@@ -198,6 +205,9 @@ if master_file and bom_file:
             selected_item = target_df[mask_select]
 
             if not selected_item.empty:
+                # Lấy hãng Master
+                final_mfg = str(selected_item.iloc[0][m_mfg]) if pd.notna(selected_item.iloc[0][m_mfg]) else ""
+
                 # --- CẬP NHẬT TỒN KHO ---
                 de_xuat = pn_bom
                 if de_xuat not in current_stock_map:
@@ -215,7 +225,7 @@ if master_file and bom_file:
                     "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": original_price_1000, 
                     "Tổng tiền (Gốc)": round(tong_tien, 4),
-                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Đã duyệt 'Chọn'",
+                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Hãng sản xuất": final_mfg, "Lý do": "Đã duyệt 'Chọn'",
                     "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                 })
             else:
@@ -243,6 +253,9 @@ if master_file and bom_file:
                     best = pd.DataFrame(valid_list).sort_values('p_num').iloc[0]
                     # So sánh giá để đề xuất
                     if best['p_num'] < price_to_compare:
+                        # Lấy hãng thay thế từ Master
+                        final_mfg = str(best[m_mfg]) if pd.notna(best[m_mfg]) else ""
+
                         # --- CẬP NHẬT TỒN KHO ---
                         de_xuat = best[m_pn]
                         if de_xuat not in current_stock_map:
@@ -260,10 +273,13 @@ if master_file and bom_file:
                             "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
-                            "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã Master rẻ hơn & đạt kỹ thuật",
+                            "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Hãng sản xuất": final_mfg, "Lý do": "Mã Master rẻ hơn & đạt kỹ thuật",
                             "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                         })
                     else:
+                        # Hãng gốc Master hoặc fall back hãng BOM
+                        final_mfg = master_mfg_val_original
+
                         # --- CẬP NHẬT TỒN KHO ---
                         de_xuat = pn_bom
                         if de_xuat not in current_stock_map:
@@ -284,10 +300,13 @@ if master_file and bom_file:
                             "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
-                            "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Giá hiện tại là rẻ nhất",
+                            "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Hãng sản xuất": final_mfg, "Lý do": "Giá hiện tại là rẻ nhất",
                             "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                         })
                 else:
+                    # Lấy hãng gốc BOM vì chưa có trên Master
+                    final_mfg = bom_mfg_val
+
                     # --- CẬP NHẬT TỒN KHO ---
                     de_xuat = pn_bom
                     if de_xuat not in current_stock_map:
@@ -303,12 +322,21 @@ if master_file and bom_file:
                         "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                         "Giá 1000pcs (Gốc)": original_price_1000, 
                         "Tổng tiền (Gốc)": round(tong_tien, 4),
-                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Không có mã thay thế đạt kỹ thuật trong Master",
+                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Hãng sản xuất": final_mfg, "Lý do": "Không có mã thay thế đạt kỹ thuật trong Master",
                         "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                     })
 
         if results:
             df_final = pd.DataFrame(results)
+            
+            # --- Tái cấu trúc lại vị trí cột cho đẹp ---
+            cols = list(df_final.columns)
+            if 'Hãng sản xuất' in cols and 'Giá Đề Xuất' in cols:
+                cols.remove('Hãng sản xuất')
+                idx_gia = cols.index('Giá Đề Xuất')
+                cols.insert(idx_gia + 1, 'Hãng sản xuất')
+                df_final = df_final[cols]
+                
             st.success("Đã đối chiếu xong!")
             st.dataframe(df_final, use_container_width=True)
             
