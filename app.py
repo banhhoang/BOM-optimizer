@@ -82,6 +82,7 @@ if master_file and bom_file:
         m_desc = st.selectbox("Cột Mô tả (Master):", sample_cols)
         m_price = st.selectbox("Cột Giá 1000pcs (Master):", sample_cols)
         m_price_1 = st.selectbox("Cột Giá 1pcs (Master):", sample_cols)
+        m_stock = st.selectbox("Cột Trong kho (Master):", sample_cols) # <-- THÊM CỘT TRONG KHO
         m_type = st.selectbox("Cột Loại hàng hóa (Master):", sample_cols)
         m_note = st.selectbox("Cột Ghi chú (Master):", sample_cols)
     with col2:
@@ -128,6 +129,8 @@ if master_file and bom_file:
     # --- BẮT ĐẦU ĐỐI CHIẾU ---
     if st.button("🚀 2. BẮT ĐẦU ĐỐI CHIẾU TOÀN BỘ", type="primary"):
         results = []
+        current_stock_map = {} # <-- THÊM: Biến lưu trữ số lượng tồn kho cộng dồn
+
         for _, row in df_bom.iterrows():
             raw_type_bom = row.get(b_type, "")
             raw_val_bom = row.get(b_val, "")
@@ -146,13 +149,17 @@ if master_file and bom_file:
                 results.append({
                     "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, 
-                    "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": "---", "Lý do": "Chỉ ưu tiên check size 0402 & 0603"
+                    "Trạng thái": "⏩ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": "---", "Lý do": "Chỉ ưu tiên check size 0402 & 0603",
+                    "Trong kho": "---", "Hành động": "---", "SL còn lại": "---" # <-- THÊM 3 CỘT MỚI VÀO ĐÂY
                 })
                 continue
 
             target_df = dict_master.get(bom_size, pd.DataFrame())
             if target_df.empty:
-                results.append({"P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Lý do": f"Không có sheet {bom_size}"})
+                results.append({
+                    "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, "Giá 1000pcs (Gốc)": "---", "Tổng tiền (Gốc)": 0.0, "Trạng thái": "❌ THIẾU SHEET", "Đề xuất": "---", "Giá Đề Xuất": "---", "Lý do": f"Không có sheet {bom_size}",
+                    "Trong kho": "---", "Hành động": "---", "SL còn lại": "---" # <-- THÊM 3 CỘT MỚI VÀO ĐÂY
+                })
                 continue
 
             # --- LẤY GIÁ TRỊ GỐC & CẬP NHẬT TỪ BẢNG NHẬP (NẾU LÀ MÃ MỚI) ---
@@ -191,11 +198,25 @@ if master_file and bom_file:
             selected_item = target_df[mask_select]
 
             if not selected_item.empty:
+                # --- CẬP NHẬT TỒN KHO ---
+                de_xuat = pn_bom
+                if de_xuat not in current_stock_map:
+                    raw_stk = selected_item.iloc[0][m_stock]
+                    val = pd.to_numeric(raw_stk, errors='coerce')
+                    current_stock_map[de_xuat] = float(val) if pd.notna(val) else 0.0
+                avail = current_stock_map[de_xuat]
+                remain = avail - qty_bom
+                action = "Đã có trong kho" if remain >= 0 else "Mua 1000pcs"
+                final_stk = remain if remain >= 0 else remain + 1000
+                current_stock_map[de_xuat] = final_stk
+                # -------------------------
+
                 results.append({
                     "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                     "Giá 1000pcs (Gốc)": original_price_1000, 
                     "Tổng tiền (Gốc)": round(tong_tien, 4),
-                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Đã duyệt 'Chọn'"
+                    "Trạng thái": "✅ ƯU TIÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Đã duyệt 'Chọn'",
+                    "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                 })
             else:
                 # --- LOGIC 2 & 3: TÌM MÃ THAY THẾ RẺ NHẤT (SO SÁNH BẰNG GIÁ 1000PCS) ---
@@ -222,25 +243,68 @@ if master_file and bom_file:
                     best = pd.DataFrame(valid_list).sort_values('p_num').iloc[0]
                     # So sánh giá để đề xuất
                     if best['p_num'] < price_to_compare:
+                        # --- CẬP NHẬT TỒN KHO ---
+                        de_xuat = best[m_pn]
+                        if de_xuat not in current_stock_map:
+                            raw_stk = best[m_stock]
+                            val = pd.to_numeric(raw_stk, errors='coerce')
+                            current_stock_map[de_xuat] = float(val) if pd.notna(val) else 0.0
+                        avail = current_stock_map[de_xuat]
+                        remain = avail - qty_bom
+                        action = "Đã có trong kho" if remain >= 0 else "Mua 1000pcs"
+                        final_stk = remain if remain >= 0 else remain + 1000
+                        current_stock_map[de_xuat] = final_stk
+                        # -------------------------
+
                         results.append({
                             "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
-                            "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã Master rẻ hơn & đạt kỹ thuật"
+                            "Trạng thái": "⚠️ CÓ MÃ THAY THẾ", "Đề xuất": best[m_pn], "Giá Đề Xuất": best[m_price], "Lý do": "Mã Master rẻ hơn & đạt kỹ thuật",
+                            "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                         })
                     else:
+                        # --- CẬP NHẬT TỒN KHO ---
+                        de_xuat = pn_bom
+                        if de_xuat not in current_stock_map:
+                            if not original_item.empty:
+                                raw_stk = original_item.iloc[0][m_stock]
+                                val = pd.to_numeric(raw_stk, errors='coerce')
+                                current_stock_map[de_xuat] = float(val) if pd.notna(val) else 0.0
+                            else:
+                                current_stock_map[de_xuat] = 0.0
+                        avail = current_stock_map[de_xuat]
+                        remain = avail - qty_bom
+                        action = "Đã có trong kho" if remain >= 0 else "Mua 1000pcs"
+                        final_stk = remain if remain >= 0 else remain + 1000
+                        current_stock_map[de_xuat] = final_stk
+                        # -------------------------
+
                         results.append({
                             "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                             "Giá 1000pcs (Gốc)": original_price_1000, 
                             "Tổng tiền (Gốc)": round(tong_tien, 4),
-                            "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Giá hiện tại là rẻ nhất"
+                            "Trạng thái": "✅ GIỮ NGUYÊN", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Giá hiện tại là rẻ nhất",
+                            "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                         })
                 else:
+                    # --- CẬP NHẬT TỒN KHO ---
+                    de_xuat = pn_bom
+                    if de_xuat not in current_stock_map:
+                        current_stock_map[de_xuat] = 0.0
+                    avail = current_stock_map[de_xuat]
+                    remain = avail - qty_bom
+                    action = "Đã có trong kho" if remain >= 0 else "Mua 1000pcs"
+                    final_stk = remain if remain >= 0 else remain + 1000
+                    current_stock_map[de_xuat] = final_stk
+                    # -------------------------
+
                     results.append({
                         "P/N BOM": pn_bom, "Giá trị": raw_val_bom, "SL cần": qty_bom, "Size": bom_size, 
                         "Giá 1000pcs (Gốc)": original_price_1000, 
                         "Tổng tiền (Gốc)": round(tong_tien, 4),
-                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Không có mã thay thế đạt kỹ thuật trong Master"
+                        "Trạng thái": "✨ Mã MỚI", "Đề xuất": pn_bom, "Giá Đề Xuất": original_price_1000, "Lý do": "Không có mã thay thế đạt kỹ thuật trong Master",
+                        "Trong kho": avail, "Hành động": action, "SL còn lại": final_stk # <-- THÊM 3 CỘT MỚI
                     })
 
         if results:
